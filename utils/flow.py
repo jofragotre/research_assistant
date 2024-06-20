@@ -329,9 +329,10 @@ if __name__ == "__main__":
 
     embedding_function = get_embedding_function()
     db = Chroma(persist_directory="chroma", embedding_function=embedding_function)
-    retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 2})
+    retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 6})
 
     model = get_llm()
     flow = RAG_Flow(retriever, model)
-    flow.generate_workflow("Do you think TALL improves deepfake detection performance?")
+    flow.generate_workflow("Are there mention of human faces in the documents?")
 
+    from crewai import Agent

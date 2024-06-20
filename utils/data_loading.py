@@ -22,44 +22,53 @@ def load_data(data_dir: str = "data"):
 
 def split_documents(documents: list[Document]):
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1024,
-        chunk_overlap=24,
+        chunk_size=512,
+        chunk_overlap=64,
         length_function=len,
         is_separator_regex=False,
     )
     return text_splitter.split_documents(documents)
 
 
-def add_to_chroma(chunks: list[Document], chroma_path: str = "chroma", embedding_function=default_embedding_function):
+def split_chunks_into_batches(lst, batch_size=150):
+    batches = []
+    for i in range(0, len(lst), batch_size):
+        batches.append(lst[i:i + batch_size])
+    return batches
 
 
-    # TODO: Chunks batching might be required
+def add_to_chroma(chunks: list[Document], chroma_path: str = "../chroma", embedding_function=default_embedding_function):
+
     # Load the existing database.
     db = Chroma(
         persist_directory=chroma_path, embedding_function=embedding_function
     )
+    batched_chunks = split_chunks_into_batches(chunks)
 
-    # Calculate Page IDs.
-    chunks_with_ids = calculate_chunk_ids(chunks)
+    for i, chunks in enumerate(batched_chunks):
+        print(f"Processing batch {i} of chunks of size {len(chunks)}")
 
-    # Add or Update the documents.
-    existing_items = db.get(include=[])  # IDs are always included by default
-    existing_ids = set(existing_items["ids"])
-    print(f"Number of existing documents in DB: {len(existing_ids)}")
+        # Calculate Page IDs.
+        chunks_with_ids = calculate_chunk_ids(chunks)
 
-    # Only add documents that don't exist in the DB.
-    new_chunks = []
-    for chunk in chunks_with_ids:
-        if chunk.metadata["id"] not in existing_ids:
-            new_chunks.append(chunk)
+        # Add or Update the documents.
+        existing_items = db.get(include=[])  # IDs are always included by default
+        existing_ids = set(existing_items["ids"])
+        print(f"Number of existing documents in DB: {len(existing_ids)}")
 
-    if len(new_chunks):
-        print(f"👉 Adding new documents: {len(new_chunks)}")
-        new_chunk_ids = [chunk.metadata["id"] for chunk in new_chunks]
-        db.add_documents(new_chunks, ids=new_chunk_ids)
-        db.persist()
-    else:
-        print("✅ No new documents to add")
+        # Only add documents that don't exist in the DB.
+        new_chunks = []
+        for chunk in chunks_with_ids:
+            if chunk.metadata["id"] not in existing_ids:
+                new_chunks.append(chunk)
+
+        if len(new_chunks):
+            print(f"👉 Adding new documents: {len(new_chunks)}")
+            new_chunk_ids = [chunk.metadata["id"] for chunk in new_chunks]
+            db.add_documents(new_chunks, ids=new_chunk_ids)
+            db.persist()
+        else:
+            print("✅ No new documents to add")
 
 
 def calculate_chunk_ids(chunks):
